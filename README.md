@@ -1,4 +1,4 @@
-# project
+# Ore counter for Dual Universe
 
 No project description was provided
 
