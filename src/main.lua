@@ -30,31 +30,40 @@ for i in pairs(All_Elements_Ids) do
         UnitsProduced = IndustryInfo.unitsProduced
         Counters[i][4] = UnitsProduced
 
-        db.setStringValue(db.getNbKeys() + 1,Counters[i][1] .. " " .. Counters[i][2] .. " " .. Counters[i][3] .. " " .. Counters[i][4])
     end
 end
 
 -- Format RawTime to "date time".
 
+-- Convert to json
+local dataAsJson = json.encode(Counters)
+
 -- Write to Databank
---local key = db.getNbKeys()
---db.setStringValue(key + 1,system.createData(Counters[i][1] .. " " .. Counters[i][2] .. " " .. Counters[i][3]))
+db.clear()
+db.setStringValue(db.getNbKeys() + 1,dataAsJson)
 
 -- Print to screen for debugging
 system.print(" - - - - - - - - - - - - - - - - - - -")
-system.print("Data from table:")
+--[[system.print("Data from table:")
 for i in pairs(Counters) do
     system.print("Time: " .. Counters[i][1])
     system.print("Id: " .. Counters[i][2])
     system.print("Name: " .. Counters[i][3])
     system.print("Produced: " .. Counters[i][4])
 end
+]]
 system.print("Data from databank:")
 for i=1,db.getNbKeys() do
-    system.print(i .. " " .. db.getStringValue(i))
+    local dataAsTable = json.decode(db.getStringValue(i))
+    for j in pairs(dataAsTable) do
+        system.print("Time: " .. dataAsTable[j][1])
+        system.print("Id: " .. dataAsTable[j][2])
+        system.print("Name: " .. dataAsTable[j][3])
+        system.print("Produced: " .. dataAsTable[j][4])
+    end
+
 end
 
---db.clear()
 
 --Industry = core.getElementIndustryInfoById(5)
 --system.print(Industry.unitsProduced)
