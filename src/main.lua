@@ -4,65 +4,83 @@ Databank = "Values" --export: The element name of the databank that stores all d
 local Core = library.getCoreUnit()
 local Db = library.getLinkByName(Databank)
 local RawTime = system.getUtcTime()
-local ElementName = ""
-local ElementId = ""
-local IndustryInfo = {}
-local TotalUnitsProduced = 0
---local DeltaUnitsProduced = 0
 
 All_Elements_Ids = Core.getElementIdList()
 
 --Db.clear()
 
 -- Get the first part of a string, case insensitive
-function starts_with(String,Start)
+local function starts_with(String,Start)
     return string.sub(string.lower(String),1,string.len(string.lower(Start))) == string.lower(Start)
 end
 
+-- Check if production is reset because of element restart
+local function DeltaUnitsProduced (unitId, currentCount)
+    local TotalUnitsProduced = json.decode(Db.getStringValue("TotalProduced")) or {}
+    local result = 0
+
+    local previousCount = TotalUnitsProduced[unitId] or 0
+
+    if currentCount > previousCount then
+        result = currentCount - previousCount
+    else
+        result = currentCount
+    end
+
+    return result
+end
+
+local function getUnitsProducedById(id)
+    return Core.getElementIndustryInfoById(id).unitsProduced
+end
+
 -- Create a matrix of element id's and names, but only for names starting with the prefix
-local AllCountersData = {}
+local AllCounters = {}
+local AllCountersProduced = {}
 local AllCountersData_Key = 0
-for i in pairs(All_Elements_Ids) do
-    ElementId = All_Elements_Ids[i]
-    ElementName = Core.getElementNameById(ElementId)
+
+for i in ipairs(All_Elements_Ids) do
+    local ElementId = All_Elements_Ids[i]
+    local ElementName = Core.getElementNameById(ElementId)
     if starts_with(ElementName, Prefix) then
         AllCountersData_Key = AllCountersData_Key + 1
-        AllCountersData[AllCountersData_Key] = {}
-        AllCountersData[AllCountersData_Key][1] = ElementId
-        IndustryInfo = Core.getElementIndustryInfoById(ElementId)
-        TotalUnitsProduced = IndustryInfo.unitsProduced
-        AllCountersData[AllCountersData_Key][2] = TotalUnitsProduced
+        AllCounters[AllCountersData_Key] = {
+            id = ElementId,
+            delta = DeltaUnitsProduced(ElementId, currentCount)
+        }
+
+        AllCountersProduced[ElementId] = currentCount
     end
 end
---[[
--- Check if production is reset because of element restart
-if Db.getNbKeys() > 0 then
-    local LastDbLine = json.decode(Db.getStringValue(Db.getNbKeys()))
-    for i in pairs(AllCountersData) do
-        if LastDbLine[2][i][2] > TotalUnitsProduced then
-            DeltaUnitsProduced = TotalUnitsProduced
-        else
-            DeltaUnitsProduced = TotalUnitsProduced - LastDbLine[i][2]
-        end
-    end
-end
-]]
 
--- Format RawTime to "date time".
+-- Format RawTime to "date time"
 
--- Write to Databank
-local NewDbLine = {RawTime, AllCountersData}
+-- Write data to new line in Databank
+local NewDbLine = { RawTime, AllCounters }
 Db.setStringValue(Db.getNbKeys() + 1,json.encode(NewDbLine))
+Db.setStringValue("TotalProduced",json.encode(AllCountersProduced))
 
 -- Print to screen for debugging
 system.print(" - - - - - - - - - - - - - - - - - - -")
-system.print("Data from databank:")
-local DbLine = {}
-for i=1, Db.getNbKeys() do
-    DbLine = json.decode(Db.getStringValue(i))
-    system.print("---- Time: " .. DbLine[1])
-    for j in pairs(DbLine[2]) do
-        system.print("Id: " .. DbLine[2][j][1] .. " --- " .. "Produced: " .. DbLine[2][j][2])
-    end
+system.print("List of records:")
 
+
+for _, key in pairs(Db.getKeyList()) do
+    if key ~= "TotalProduced" then
+        local data = json.decode(Db.getStringValue(key))
+        system.print("---- Time: " .. data[1])
+        for j in pairs(data[2]) do
+            system.print("Id: " .. data[2][j].id .. " --- " .. "Delta: " .. data[2][j].delta)
+        end
+    end
 end
+
+system.print("List of max values:")
+local data = json.decode(Db.getStringValue("TotalProduced"))
+for id, value in pairs(data) do
+    system.print("Id: " .. id .. " --- " .. "Produced: :" .. value)
+end
+--
+--for i=1,#DbLines do
+--    system.print("Id: " .. DbLines[i][1] .. " --- " .. "Produced: :" .. DbLines[i][2])
+--end
